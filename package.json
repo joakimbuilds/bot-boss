@@ -1,0 +1,11 @@
+{
+  "name": "bot-boss",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Grok-Bot-style command center for Claude Code agents (launcher model)",
+  "license": "MIT",
+  "engines": { "node": ">=18" },
+  "keywords": ["claude", "claude-code", "agents", "dashboard", "tui", "cli"],
+  "bin": { "bot-boss": "server.js" },
+  "scripts": { "start": "node server.js" }
+}

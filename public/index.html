@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bot Boss</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23d97757'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%231a0f0a'%3E%E2%97%86%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #0a0a0b; --panel: #121214; --panel2: #17171a; --line: #232327;
+    --text: #e9e9ec; --dim: #8a8a93; --dimmer: #5c5c64;
+    --accent: #d97757; --accent2: #e6a08a;
+    --green: #3fb950; --amber: #d29922; --red: #f85149; --blue: #58a6ff;
+    --user: #1f2a37; --assistant: #17171a;
+    --radius: 12px; --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--sans);
+    font-size: 14px; display: grid; grid-template-columns: 280px 1fr 300px; height: 100vh; overflow: hidden;
+  }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  .brand { padding: 16px 18px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+  .brand .logo { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: grid; place-items: center; font-weight: 700; color: #1a0f0a; }
+  .brand h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  .brand .sub { font-size: 11px; color: var(--dim); margin-left: auto; }
+
+  .newbtn { margin: 12px 14px 6px; padding: 10px; border: 1px dashed var(--line); background: transparent; color: var(--accent2);
+    border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 13px; transition: .15s; }
+  .newbtn:hover { background: var(--panel2); border-color: var(--accent); color: var(--accent); }
+
+  .sectitle { font-size: 10.5px; text-transform: uppercase; letter-spacing: .8px; color: var(--dimmer); padding: 14px 18px 6px; font-weight: 700; }
+  .list { overflow-y: auto; flex: 1; min-height: 0; }
+  .contact { display: flex; align-items: center; gap: 11px; padding: 10px 16px; cursor: pointer; border-left: 2px solid transparent; }
+  .contact:hover { background: var(--panel2); }
+  .contact.active { background: var(--panel2); border-left-color: var(--accent); }
+  .avatar { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-weight: 700; font-size: 14px; flex-shrink: 0; color: #0a0a0b; }
+  .contact .meta { min-width: 0; flex: 1; }
+  .contact .nm { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .contact .last { font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .dot.working { background: var(--amber); box-shadow: 0 0 0 0 var(--amber); animation: pulse 1.3s infinite; }
+  .dot.ready { background: var(--green); }
+  .dot.blocked { background: var(--red); }
+  .dot.dead { background: var(--dimmer); }
+  .dot.idle { background: var(--dimmer); }
+  .dot.busy { background: var(--amber); }
+  @keyframes pulse { 0%{ box-shadow: 0 0 0 0 rgba(210,153,34,.5);} 70%{ box-shadow: 0 0 0 6px rgba(210,153,34,0);} 100%{ box-shadow: 0 0 0 0 rgba(210,153,34,0);} }
+
+  /* ---------- Chat ---------- */
+  #chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+  .chathead { padding: 14px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+  .chathead .nm { font-weight: 600; font-size: 15px; }
+  .chathead .badge { font-size: 11px; padding: 3px 9px; border-radius: 20px; background: var(--panel2); color: var(--dim); border: 1px solid var(--line); }
+  .chathead .cwd { font-family: var(--mono); font-size: 11.5px; color: var(--dimmer); margin-left: auto; }
+
+  #messages { flex: 1; overflow-y: auto; padding: 24px 22px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 82%; }
+  .msg.user { align-self: flex-end; }
+  .bubble { padding: 11px 14px; border-radius: var(--radius); line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
+  .msg.user .bubble { background: var(--user); border: 1px solid #24344a; border-bottom-right-radius: 3px; }
+  .msg.assistant .bubble { background: var(--assistant); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
+  .msg .role { font-size: 10.5px; color: var(--dimmer); margin: 0 4px 4px; text-transform: uppercase; letter-spacing: .5px; }
+  .msg.user .role { text-align: right; }
+
+  .thinking .bubble { background: transparent; border: 1px dashed var(--line); color: var(--dim); font-style: italic; font-size: 13px; }
+  .tool .bubble { background: #0e1116; border: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--blue); }
+  .tool .bubble .tname { color: var(--accent2); font-weight: 700; }
+  .toolresult .bubble { background: #0c0d0f; border: 1px solid var(--line); font-family: var(--mono); font-size: 11.5px; color: var(--dim); max-height: 220px; overflow: auto; }
+  .sysmsg { align-self: center; font-size: 11.5px; color: var(--dimmer); font-family: var(--mono); }
+  .sysmsg.error { color: var(--red); }
+  .cursor::after { content: "▋"; color: var(--accent); animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---------- Composer ---------- */
+  #composer { border-top: 1px solid var(--line); padding: 14px 18px; display: flex; gap: 10px; align-items: flex-end; }
+  #composer textarea { flex: 1; resize: none; background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 12px; padding: 11px 14px; font-family: var(--sans); font-size: 14px; line-height: 1.4; max-height: 160px; }
+  #composer textarea:focus { outline: none; border-color: var(--accent); }
+  #composer button { background: var(--accent); color: #1a0f0a; border: none; border-radius: 11px; padding: 11px 18px; font-weight: 700; cursor: pointer; font-size: 14px; }
+  #composer button:disabled { opacity: .4; cursor: not-allowed; }
+  .readonly-note { padding: 14px; text-align: center; color: var(--dimmer); font-size: 12.5px; border-top: 1px solid var(--line); font-family: var(--mono); }
+
+  /* ---------- Details ---------- */
+  #details { background: var(--panel); border-left: 1px solid var(--line); padding: 20px 18px; overflow-y: auto; }
+  #details h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--dimmer); margin: 0 0 14px; }
+  .kv { margin-bottom: 14px; }
+  .kv .k { font-size: 11px; color: var(--dim); margin-bottom: 3px; }
+  .kv .v { font-size: 13px; font-family: var(--mono); word-break: break-all; }
+  .dbtn { width: 100%; margin-top: 10px; padding: 9px; border-radius: 9px; border: 1px solid var(--line); background: transparent; color: var(--red); cursor: pointer; font-weight: 600; font-size: 12.5px; }
+  .dbtn:hover { background: rgba(248,81,73,.08); }
+
+  .empty { flex: 1; display: grid; place-items: center; color: var(--dimmer); text-align: center; }
+  .empty .big { font-size: 44px; margin-bottom: 10px; opacity: .5; }
+
+  /* ---------- Modal ---------- */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; place-items: center; z-index: 50; }
+  .overlay.show { display: grid; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; width: 460px; max-width: 92vw; }
+  .modal h2 { margin: 0 0 18px; font-size: 17px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 6px; }
+  .field input, .field select, .field textarea { width: 100%; background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 9px; padding: 9px 11px; font-family: var(--sans); font-size: 13.5px; }
+  .field textarea { resize: vertical; min-height: 70px; font-family: var(--mono); font-size: 12.5px; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .modal-actions button { padding: 10px 18px; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 13.5px; border: none; }
+  .btn-cancel { background: transparent; color: var(--dim); border: 1px solid var(--line) !important; }
+  .btn-go { background: var(--accent); color: #1a0f0a; }
+  .hint { font-size: 11px; color: var(--dimmer); margin-top: 4px; }
+</style>
+</head>
+<body>
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="logo">◆</div>
+      <h1>Bot Boss</h1>
+      <span class="sub" id="clock"></span>
+    </div>
+    <button class="newbtn" onclick="openModal()">+ New Agent</button>
+    <div class="list" id="list"></div>
+  </aside>
+
+  <main id="chat">
+    <div id="chatbody" class="empty">
+      <div>
+        <div class="big">◆</div>
+        <div>Select an agent, or dispatch a new one.</div>
+      </div>
+    </div>
+  </main>
+
+  <aside id="details"><div class="empty" style="height:100%"><div>No agent selected</div></div></aside>
+
+  <!-- New Agent modal -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h2>Dispatch a new agent</h2>
+      <div class="field">
+        <label>Name</label>
+        <input id="f-name" placeholder="e.g. refactor-auth" />
+      </div>
+      <div class="field">
+        <label>Working directory</label>
+        <select id="f-cwd"></select>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Model</label>
+          <select id="f-model"></select>
+        </div>
+        <div class="field">
+          <label>Permissions</label>
+          <select id="f-perm">
+            <option value="acceptEdits">acceptEdits</option>
+            <option value="bypassPermissions">bypassPermissions (autonomous)</option>
+            <option value="default">default (asks, stalls headless)</option>
+            <option value="plan">plan</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>First task</label>
+        <textarea id="f-task" placeholder="What should this agent do?"></textarea>
+        <div class="hint">bypassPermissions lets it run tools without prompting. Uses your Claude quota.</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-go" onclick="dispatch()">Dispatch</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let state = { agents: [], peers: [], dirs: [], models: [] };
+let selected = null;      // {id, owned}
+let transcripts = {};     // id -> [entries]
+
+const COLORS = ["#d97757","#58a6ff","#3fb950","#bc8cff","#d29922","#39c5cf","#f778ba","#7ee787"];
+function colorFor(s){ let h=0; for(const c of s) h=(h*31+c.charCodeAt(0))>>>0; return COLORS[h%COLORS.length]; }
+function initials(s){ return (s||"?").replace(/[^a-zA-Z0-9]/g,"").slice(0,2).toUpperCase() || "?"; }
+function ago(t){ if(!t) return ""; const s=(Date.now()-t)/1000; if(s<60) return Math.floor(s)+"s"; if(s<3600) return Math.floor(s/60)+"m"; return Math.floor(s/3600)+"h"; }
+
+async function loadState(){
+  const r = await fetch("/api/state"); state = await r.json();
+  render();
+}
+
+function statusRank(a){ const o={blocked:0,working:1,busy:1,ready:2,idle:3,dead:4}; return o[a.status]??9; }
+
+function render(){
+  const list = $("#list");
+  const owned = [...state.agents].sort((a,b)=> statusRank(a)-statusRank(b) || b.lastActivity-a.lastActivity);
+  const peers = [...state.peers].sort((a,b)=> statusRank(a)-statusRank(b));
+  let html = "";
+  html += `<div class="sectitle">Agents · ${owned.length}</div>`;
+  if(!owned.length) html += `<div style="padding:6px 18px;color:var(--dimmer);font-size:12px">None yet</div>`;
+  for(const a of owned) html += contactRow(a, true);
+  html += `<div class="sectitle">Terminal Tabs · ${peers.length} <span style="color:var(--dimmer);font-weight:400;text-transform:none;letter-spacing:0"> read-only</span></div>`;
+  for(const p of peers) html += contactRow(p, false);
+  list.innerHTML = html;
+  renderDetails();
+}
+
+function contactRow(a, owned){
+  const active = selected && selected.id===a.id ? "active":"";
+  const last = owned ? (statusText(a.status)) : (a.cwd.split("/").pop()+" · "+a.status);
+  return `<div class="contact ${active}" onclick="select('${a.id}',${owned})">
+    <div class="avatar" style="background:${colorFor(a.name||a.id)}">${initials(a.name)}</div>
+    <div class="meta"><div class="nm">${esc(a.name)}</div><div class="last">${esc(last)}</div></div>
+    <div class="dot ${a.status}"></div>
+  </div>`;
+}
+function statusText(s){ return ({working:"working…",ready:"ready for input",blocked:"needs input",dead:"exited",starting:"starting…"})[s]||s; }
+
+async function select(id, owned){
+  selected = { id, owned };
+  render();
+  const r = await fetch("/api/agents/"+id);
+  const d = await r.json();
+  transcripts[id] = d.transcript || [];
+  renderChat();
+  renderDetails();
+}
+
+function renderChat(){
+  const body = $("#chat");
+  if(!selected){ return; }
+  const a = findAny(selected.id);
+  const t = transcripts[selected.id] || [];
+  const owned = selected.owned && a && a.owned !== false;
+  body.innerHTML = `
+    <div class="chathead">
+      <div class="avatar" style="width:30px;height:30px;background:${colorFor(a?.name||selected.id)}">${initials(a?.name)}</div>
+      <div class="nm">${esc(a?.name||selected.id)}</div>
+      <span class="badge">${a?a.status:""}</span>
+      <span class="cwd">${esc(a?.cwd||"")}</span>
+    </div>
+    <div id="messages"></div>
+    ${owned
+      ? `<div id="composer"><textarea id="input" rows="1" placeholder="Message ${esc(a.name)}…"></textarea><button id="send" onclick="sendMsg()">Send</button></div>`
+      : `<div class="readonly-note">read-only view of a live terminal tab, reply in its own Terminal window</div>`}
+  `;
+  const box = $("#messages");
+  box.innerHTML = t.map(msgHTML).join("");
+  box.scrollTop = box.scrollHeight;
+  const inp = $("#input");
+  if(inp){
+    inp.addEventListener("keydown",(e)=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendMsg(); }});
+    inp.addEventListener("input",()=>{ inp.style.height="auto"; inp.style.height=Math.min(inp.scrollHeight,160)+"px"; });
+    inp.focus();
+  }
+}
+
+function msgHTML(m){
+  if(m.role==="system") return `<div class="sysmsg ${m.kind==='error'?'error':''}">${esc(m.text)}</div>`;
+  if(m.kind==="thinking") return `<div class="msg assistant thinking"><div class="role">thinking</div><div class="bubble">${esc(m.text)}${m.live?'<span class="cursor"></span>':''}</div></div>`;
+  if(m.kind==="tool_use") return `<div class="msg assistant tool"><div class="bubble"><span class="tname">${esc(m.tool||'tool')}</span> ${esc(m.text)}</div></div>`;
+  if(m.kind==="tool_result") return `<div class="msg assistant toolresult"><div class="bubble">${esc(m.text)}</div></div>`;
+  const cls = m.role==="user"?"user":"assistant";
+  return `<div class="msg ${cls}"><div class="role">${m.role}</div><div class="bubble">${esc(m.text)}${m.live?'<span class="cursor"></span>':''}</div></div>`;
+}
+
+function renderDetails(){
+  const d = $("#details");
+  const a = selected ? findAny(selected.id) : null;
+  if(!a){ d.innerHTML = `<div class="empty" style="height:100%"><div>No agent selected</div></div>`; return; }
+  const rows = [
+    ["Status", a.status],
+    ["Model", a.model||"-"],
+    ["Working dir", a.cwd||"-"],
+    ["Session", (a.sessionId||"-")],
+    ["Kind", a.owned===false?"terminal tab":"owned agent"],
+    ["Age", ago(a.createdAt)],
+    ["Cost", a.costUSD!=null?("$"+(a.costUSD).toFixed(4)):"-"],
+  ];
+  d.innerHTML = `<h3>Details</h3>` + rows.map(([k,v])=>`<div class="kv"><div class="k">${k}</div><div class="v">${esc(String(v))}</div></div>`).join("")
+    + (a.owned!==false ? `<button class="dbtn" onclick="killAgent('${a.id}')">Terminate agent</button>` : "");
+}
+
+function findAny(id){ return state.agents.find(a=>a.id===id) || state.peers.find(p=>p.id===id); }
+
+async function sendMsg(){
+  const inp = $("#input"); if(!inp) return;
+  const text = inp.value.trim(); if(!text) return;
+  inp.value=""; inp.style.height="auto";
+  await fetch("/api/agents/"+selected.id+"/message",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+}
+
+async function killAgent(id){
+  if(!confirm("Terminate this agent?")) return;
+  await fetch("/api/agents/"+id,{method:"DELETE"});
+  if(selected&&selected.id===id){ selected=null; $("#chat").innerHTML=`<div id="chatbody" class="empty"><div><div class="big">◆</div><div>Select an agent, or dispatch a new one.</div></div></div>`; }
+  loadState();
+}
+
+/* ---- modal ---- */
+function openModal(){
+  const cwd=$("#f-cwd"); cwd.innerHTML = state.dirs.map(d=>`<option value="${esc(d)}">${esc(d.replace(/^\/(Users|home)\/[^/]+\//,'~/'))}</option>`).join("");
+  $("#f-model").innerHTML = state.models.map(m=>`<option value="${m}"${m.includes('sonnet')?' selected':''}>${m}</option>`).join("");
+  $("#overlay").classList.add("show"); $("#f-name").focus();
+}
+function closeModal(){ $("#overlay").classList.remove("show"); }
+async function dispatch(){
+  const body = {
+    name: $("#f-name").value.trim(),
+    cwd: $("#f-cwd").value,
+    model: $("#f-model").value,
+    permissionMode: $("#f-perm").value,
+    task: $("#f-task").value.trim(),
+  };
+  closeModal();
+  $("#f-name").value=""; $("#f-task").value="";
+  const r = await fetch("/api/agents",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const a = await r.json();
+  await loadState();
+  select(a.id, true);
+}
+
+/* ---- live events ---- */
+function connectSSE(){
+  const es = new EventSource("/api/events");
+  es.onmessage = (e)=>{
+    const ev = JSON.parse(e.data);
+    if(ev.type==="peers"){ state.peers = ev.peers; render(); return; }
+    if(ev.type==="agent_added"){ loadState(); return; }
+    if(ev.type==="agent_removed"){ loadState(); return; }
+    if(ev.type==="agent_status"){
+      const a = state.agents.find(x=>x.id===ev.id);
+      if(a){ a.status=ev.status; if(ev.costUSD!=null)a.costUSD=ev.costUSD; a.lastActivity=Date.now(); render(); }
+      return;
+    }
+    if(ev.type==="agent_msg" || ev.type==="agent_delta"){
+      const arr = transcripts[ev.id] || (transcripts[ev.id]=[]);
+      if(ev.type==="agent_delta"){
+        const i = arr.findIndex(m=>m.id===ev.entry.id);
+        if(i>=0) arr[i]=ev.entry; else arr.push(ev.entry);
+      } else {
+        arr.push(ev.entry);
+      }
+      if(selected && selected.id===ev.id) appendOrRerender();
+      return;
+    }
+  };
+  es.onerror = ()=>{ /* auto-retry */ };
+}
+
+function appendOrRerender(){
+  const box = $("#messages"); if(!box) return;
+  const t = transcripts[selected.id]||[];
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.innerHTML = t.map(msgHTML).join("");
+  if(atBottom) box.scrollTop = box.scrollHeight;
+}
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+setInterval(()=>{ $("#clock").textContent = new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); render(); }, 1000);
+loadState(); connectSSE();
+</script>
+</body>
+</html>
