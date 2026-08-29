@@ -4,8 +4,10 @@
   "private": true,
   "description": "Grok-Bot-style command center for Claude Code agents (launcher model)",
   "license": "MIT",
+  "author": "joakimbuilds (https://github.com/joakimbuilds)",
+  "repository": { "type": "git", "url": "git+https://github.com/joakimbuilds/bot-boss.git" },
   "engines": { "node": ">=18" },
-  "keywords": ["claude", "claude-code", "agents", "dashboard", "tui", "cli"],
+  "keywords": ["claude", "claude-code", "agents", "dashboard", "web-ui", "cli"],
   "bin": { "bot-boss": "server.js" },
   "scripts": { "start": "node server.js" }
 }
