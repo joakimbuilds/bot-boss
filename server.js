@@ -93,7 +93,9 @@ class Agent {
     this.started = true;
     const proc = spawn(CLAUDE_BIN, args, {
       cwd: this.cwd,
-      env: process.env,
+      // BOT_BOSS_API lets a bot reach this server's HTTP API (e.g. to create
+      // sibling bots) without hardcoding the port.
+      env: { ...process.env, BOT_BOSS_API: `http://127.0.0.1:${PORT}` },
       stdio: ["pipe", "pipe", "pipe"],
     });
     this.proc = proc;
