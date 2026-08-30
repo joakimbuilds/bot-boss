@@ -110,10 +110,23 @@ class Agent {
         this._push({ role: "system", kind: "error", text: s.trim() });
       }
     });
-    proc.on("exit", () => {
+    proc.on("exit", (code, signal) => {
       this.proc = null;
-      // an idle exit just means the turn ended; keep the bot resumable.
-      if (this.status !== "ready") { this.status = "ready"; broadcast({ type: "agent_status", id: this.id, status: this.status }); }
+      // A clean end-of-turn exit reaches here already flipped to "ready" by the
+      // "result" event. If we're still "working", the process died mid-turn:
+      // distinguish a crash (non-zero code / killed by signal) from a benign
+      // idle exit so the UI can show it as dead rather than a phantom "working".
+      const crashed = (code != null && code !== 0) || signal != null;
+      if (this.status === "working" && crashed) {
+        this.status = "dead";
+        this._push({
+          role: "system", kind: "error",
+          text: `bot process exited mid-turn ${signal ? `on ${signal}` : `with code ${code}`}`,
+        });
+      } else if (this.status !== "ready" && this.status !== "dead") {
+        this.status = "ready"; // idle exit; keep the bot resumable
+      }
+      broadcast({ type: "agent_status", id: this.id, status: this.status });
       this.save();
     });
   }
@@ -141,6 +154,14 @@ class Agent {
     try {
       this.proc.stdin.write(JSON.stringify(msg) + "\n");
     } catch (e) {
+      // spawn or stdin write failed (e.g. CLAUDE_BIN not on PATH). _spawn()
+      // already flipped status to "working"; surface the failure instead of
+      // leaving the bot stuck there.
+      this.proc = null;
+      this.status = "dead";
+      this._push({ role: "system", kind: "error", text: `failed to start/send to bot process: ${e.message}` });
+      broadcast({ type: "agent_status", id: this.id, status: this.status });
+      this.save();
       return false;
     }
     this._push({ role: "user", kind: "text", text });
@@ -162,7 +183,16 @@ class Agent {
     this.proc = null;
   }
 
-  stop() { this._killProc(); }
+  // Stop kills the process; because _killProc() detaches the exit listener,
+  // nothing else will move the bot off "working", so reset status here. Without
+  // this, a stopped bot shows as a phantom "working" (busy) forever.
+  stop() {
+    this._killProc();
+    this.status = "ready"; // idle and resumable via --resume on next message
+    this.lastActivity = Date.now();
+    broadcast({ type: "agent_status", id: this.id, status: this.status });
+    this.save();
+  }
 
   // wipe all context: kill the process, start a brand-new session, clear history
   reset() {
